@@ -1,0 +1,208 @@
+Option Explicit
+#If Win64 Then
+    Public Declare PtrSafe Function GetPrivateProfileString _
+        Lib "kernel32" Alias "GetPrivateProfileStringA" ( _
+            ByVal lpApplicationName As String, ByVal lpKeyName As Any, ByVal lpDefault As String, _
+            ByVal lpReturnedString As String, ByVal nSize As Long, ByVal lpFilename As String) As Long
+    Public Declare PtrSafe Function WritePrivateProfileString _
+        Lib "kernel32" Alias "WritePrivateProfileStringA" ( _
+            ByVal lpApplicationName As String, ByVal lpKeyName As Any, _
+            ByVal lpString As Any, ByVal lpFilename As String) As Long
+#Else
+    Public Declare Function GetPrivateProfileString _
+        Lib "kernel32" Alias "GetPrivateProfileStringA" ( _
+            ByVal lpApplicationName As String, ByVal lpKeyName As Any, ByVal lpDefault As String, _
+            ByVal lpReturnedString As String, ByVal nSize As Long, ByVal lpFilename As String) As Long
+    Public Declare Function WritePrivateProfileString _
+        Lib "kernel32" Alias "WritePrivateProfileStringA" ( _
+            ByVal lpApplicationName As String, ByVal lpKeyName As Any, _
+            ByVal lpString As Any, ByVal lpFilename As String) As Long
+#End If
+
+
+Type RGBData
+    Rx As Integer
+    Ry As Integer
+    RL As Long
+    Gx As Integer
+    Gy As Integer
+    GL As Long
+    Bx As Integer
+    By As Integer
+    BL As Long
+End Type
+
+Public Const MAXCOUNT As Long = 256
+Dim pth$
+
+Sub OldDataBackup()
+    Dim LEDNum As Integer
+    
+    Sheets("CaliValues").Range(Cells(2, 29), Cells(74, 41)).ClearContents
+    
+    LEDNum = Sheets("CaliValues").Cells(10, 16)
+    '字符的复制
+    Sheets("CaliValues").Range(Cells(2, 29), Cells(LEDNum + 1, 41)).value = Sheets("CaliValues").Range(Cells(2, 1), Cells(LEDNum + 1, 13)).value
+    '红绿蓝背景色复制
+    'Sheets("CaliValues").Range(Cells(2, 30), Cells(LEDNum + 1, 33)).Interior.Color = Sheets("CaliValues").Range(Cells(2, 2), Cells(LEDNum + 1, 5)).Interior.Color
+    'Sheets("CaliValues").Range(Cells(2, 34), Cells(LEDNum + 1, 37)).Interior.Color = Sheets("CaliValues").Range(Cells(2, 6), Cells(LEDNum + 1, 9)).Interior.Color
+    'Sheets("CaliValues").Range(Cells(2, 38), Cells(LEDNum + 1, 41)).Interior.Color = Sheets("CaliValues").Range(Cells(2, 10), Cells(LEDNum + 1, 13)).Interior.Color
+
+    
+End Sub
+
+Sub CANdataMaker()
+    '获得LED颗数
+    Dim LEDNum As Integer
+    LEDNum = Sheets("CaliValues").Cells(10, 16)
+        
+    ReDim smartlightData(1 To LEDNum) As RGBData
+    Dim cnt As Integer
+    For cnt = 1 To LEDNum
+        With smartlightData(cnt)
+            .Rx = Cells(1 + cnt, 2)
+            .Ry = Cells(1 + cnt, 3)
+            .RL = Cells(1 + cnt, 5)
+            .Gx = Cells(1 + cnt, 6)
+            .Gy = Cells(1 + cnt, 7)
+            .GL = Cells(1 + cnt, 9)
+            .Bx = Cells(1 + cnt, 10)
+            .By = Cells(1 + cnt, 11)
+            .BL = Cells(1 + cnt, 13)
+        End With
+    Next
+    
+    'For cnt = 1 To 54
+     '   Debug.Print "led " & cnt
+      '  With smartlightData(cnt)
+       '     Debug.Print "   rx=" & .Rx & "   ry=" & .Ry & "   rl=" & .RL & "   gx=" & .Gx & "   gy=" & .Gy & "   gl=" & .GL & "   bx=" & .Bx & "   by=" & .By & "   bl=" & .BL
+        'End With
+    'Next
+    
+    
+'    pth = ThisWorkbook.Path & "\*" & ".ini"
+'    'Debug.Print pth
+'    If Dir(pth) <> "" Then
+'        Kill pth '判断文件是否存在，存在先删除
+'    End If
+
+    'pth = ThisWorkbook.Path & "\" & "ljm.ini"
+    pth = ThisWorkbook.Path & "\" & "ljm" & LEDNum & ".ini"
+    
+    For cnt = 1 To LEDNum
+        With smartlightData(cnt)
+            Call WriteStringToIni(pth, "LED_" & cnt, "Redx", .Rx)
+            Call WriteStringToIni(pth, "LED_" & cnt, "Redy", .Ry)
+            Call WriteStringToIni(pth, "LED_" & cnt, "RedL", .RL)
+            Call WriteStringToIni(pth, "LED_" & cnt, "Greenx", .Gx)
+            Call WriteStringToIni(pth, "LED_" & cnt, "Greeny", .Gy)
+            Call WriteStringToIni(pth, "LED_" & cnt, "GreenL", .GL)
+            Call WriteStringToIni(pth, "LED_" & cnt, "Bluex", .Bx)
+            Call WriteStringToIni(pth, "LED_" & cnt, "Bluey", .By)
+            Call WriteStringToIni(pth, "LED_" & cnt, "BlueL", .BL)
+        End With
+    Next
+    
+    Call OldDataBackup
+End Sub
+
+
+'********************************************************************
+'用途：     写入指定的键值
+'参数名     说明
+'FileName   Ini 文件全名(含路径)
+'Section    节点的名称
+'Key        键名
+'Value      需要写入的键值
+'********************************************************************
+Public Sub WriteStringToIni(ByVal FileName As String, ByVal Section As String, ByVal Key As String, ByVal value As String)
+    Dim xBuff As String * MAXCOUNT
+    xBuff = value + Chr(0)
+    WritePrivateProfileString Section, Key, xBuff, FileName
+End Sub
+
+
+Public Sub ReadStringFromIni(ByVal FileName As String, ByVal Section As String, ByVal Key As String, ByRef Svalue As String)
+  '  Debug.Print "   " & FileName & "   " & Section & "   " & Key & "    " & value
+    Dim xBuff As String * 254
+    GetPrivateProfileString Section, Key, "hahaha", xBuff, MAXCOUNT, FileName
+    Svalue = xBuff
+End Sub
+
+
+Sub StringHEXtoInteger(ByVal HEX As String, ByRef Lvalue As Long)
+   ' pth = ThisWorkbook.Path & "\" & "DataDump.ini"
+    Dim Hvalue As String
+   ' Call ReadStringFromIni(pth, "LED_" & 2, "Greenx", value)
+    
+   ' Debug.Print "1   " & HEX
+    Hvalue = Replace(HEX, "0x", "")
+    'Debug.Print "2   " & Hvalue
+    Hvalue = RTrim(Hvalue)
+    Hvalue = "&H" & Hvalue & "&"
+    'Debug.Print "3   " & Hvalue
+    Lvalue = Val(Hvalue) '// 16
+    'Debug.Print "4   " & Lvalue
+End Sub
+
+
+Sub GetAllLEDDataFromLJMINI()
+    
+    Dim Hvalue As String
+    Dim value As Long
+    Dim cnt As Integer
+    
+    '获得LED颗数
+    Dim LEDNum As Integer
+    LEDNum = Sheets("CaliValues").Cells(10, 16)
+    
+    pth = ThisWorkbook.Path & "\" & "DataDump" & LEDNum & ".ini"
+    
+    
+    For cnt = 1 To LEDNum
+        Call ReadStringFromIni(pth, "LED_" & cnt, "Redx", Hvalue)
+        Cells(1 + cnt, 2) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 2), value)
+        Cells(1 + cnt, 2) = value
+        
+        Call ReadStringFromIni(pth, "LED_" & cnt, "Redy", Hvalue)
+        Cells(1 + cnt, 3) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 3), value)
+        Cells(1 + cnt, 3) = value
+        
+        Call ReadStringFromIni(pth, "LED_" & cnt, "RedL", Hvalue)
+        Cells(1 + cnt, 5) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 5), value)
+        Cells(1 + cnt, 5) = value
+
+        Call ReadStringFromIni(pth, "LED_" & cnt, "Greenx", Hvalue)
+        Cells(1 + cnt, 6) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 6), value)
+        Cells(1 + cnt, 6) = value
+        
+        Call ReadStringFromIni(pth, "LED_" & cnt, "Greeny", Hvalue)
+        Cells(1 + cnt, 7) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 7), value)
+        Cells(1 + cnt, 7) = value
+        
+        Call ReadStringFromIni(pth, "LED_" & cnt, "GreenL", Hvalue)
+        Cells(1 + cnt, 9) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 9), value)
+        Cells(1 + cnt, 9) = value
+        
+        Call ReadStringFromIni(pth, "LED_" & cnt, "Bluex", Hvalue)
+        Cells(1 + cnt, 10) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 10), value)
+        Cells(1 + cnt, 10) = value
+        
+        Call ReadStringFromIni(pth, "LED_" & cnt, "Bluey", Hvalue)
+        Cells(1 + cnt, 11) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 11), value)
+        Cells(1 + cnt, 11) = value
+        
+        Call ReadStringFromIni(pth, "LED_" & cnt, "BlueL", Hvalue)
+        Cells(1 + cnt, 13) = Hvalue
+        Call StringHEXtoInteger(Cells(1 + cnt, 13), value)
+        Cells(1 + cnt, 13) = value
+    Next
+End Sub

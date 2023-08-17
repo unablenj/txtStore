@@ -1,0 +1,534 @@
+Private Const column_A_Redx As Byte = 2
+Private Const column_A_Redy As Byte = 3
+Private Const column_A_RedL As Byte = 5
+Private Const column_A_Greenx As Byte = 6
+Private Const column_A_Greeny As Byte = 7
+Private Const column_A_GreenL As Byte = 9
+Private Const column_A_Bluex As Byte = 10
+Private Const column_A_Bluey As Byte = 11
+Private Const column_A_BlueL As Byte = 13
+Private Const column_Para_Show As Byte = 16
+Private Const column_Meas_WhiteL As Byte = 18
+Private Const column_Meas_Whitex As Byte = 19
+Private Const column_Meas_Whitey As Byte = 20
+Private Const column_Meas_OldWhiteDeltaE As Byte = 21
+Private Const column_Meas_WhiteDeltaE As Byte = 22
+Private Const column_Meas_Increment As Byte = 23
+Private Const MAXLEDNum As Integer = 90
+Dim LEDs As Integer
+Dim MaxLumin As Integer
+Dim MinLumin As Integer
+Dim Coeff_base(1 To MAXLEDNum) As Long  '万一级
+Dim Coeff_R2B(1 To MAXLEDNum) As Double '红色分量与蓝色分量的比值
+Dim cnt As Integer
+Dim DeltaE_Old(1 To MAXLEDNum) As Double
+
+Sub datafilling()
+
+    LEDs = Cells(10, column_Para_Show)
+    Range(Cells(2, 1), Cells(MAXLEDNum, 13)).ClearContents
+    Range(Cells(2, 2), Cells(MAXLEDNum, 13)).Interior.Pattern = xlSolid
+    Range(Cells(2, 2), Cells(MAXLEDNum, 13)).Interior.PatternColorIndex = xlAutomatic
+    Range(Cells(2, 2), Cells(MAXLEDNum, 5)).Interior.Color = 192
+    Range(Cells(2, 6), Cells(MAXLEDNum, 9)).Interior.Color = 5296274
+    Range(Cells(2, 10), Cells(MAXLEDNum, 13)).Interior.Color = 15773696
+    Range(Cells(LEDs + 2, 1), Cells(MAXLEDNum, 13)).Interior.Pattern = xlNone
+        
+    For cnt = 1 To LEDs
+        Cells(cnt + 1, 1) = cnt
+        Sheets("CaliValues").Cells(1 + cnt, 2) = Sheets("R").Cells(1 + cnt, 7)  'Redx
+        Sheets("CaliValues").Cells(1 + cnt, 3) = Sheets("R").Cells(1 + cnt, 8)  'Redy
+        Sheets("CaliValues").Cells(1 + cnt, 4) = Sheets("R").Cells(1 + cnt, 6)  'RedL
+        Sheets("CaliValues").Cells(1 + cnt, 6) = Sheets("G").Cells(1 + cnt, 7)  'Greenx
+        Sheets("CaliValues").Cells(1 + cnt, 7) = Sheets("G").Cells(1 + cnt, 8)  'Greeny
+        Sheets("CaliValues").Cells(1 + cnt, 8) = Sheets("G").Cells(1 + cnt, 6)  'GreenL
+        Sheets("CaliValues").Cells(1 + cnt, 10) = Sheets("B").Cells(1 + cnt, 7)  'Bluex
+        Sheets("CaliValues").Cells(1 + cnt, 11) = Sheets("B").Cells(1 + cnt, 8)  'Bluey
+        Sheets("CaliValues").Cells(1 + cnt, 12) = Sheets("B").Cells(1 + cnt, 6)  'BlueL
+    
+        'redx,y,L
+        Cells(cnt + 1, column_A_Redx) = Round(Cells(cnt + 1, column_A_Redx) * 10000)
+        Cells(cnt + 1, column_A_Redy) = Round(Cells(cnt + 1, column_A_Redy) * 10000)
+        Cells(cnt + 1, column_A_RedL) = Round(Cells(cnt + 1, 4) * 25)
+        'greenx,y,L
+        Cells(cnt + 1, column_A_Greenx) = Round(Cells(cnt + 1, column_A_Greenx) * 10000)
+        Cells(cnt + 1, column_A_Greeny) = Round(Cells(cnt + 1, column_A_Greeny) * 10000)
+        Cells(cnt + 1, column_A_GreenL) = Round(Cells(cnt + 1, 8) * 25)
+        'bluex,y,L
+        Cells(cnt + 1, column_A_Bluex) = Round(Cells(cnt + 1, column_A_Bluex) * 10000)
+        Cells(cnt + 1, column_A_Bluey) = Round(Cells(cnt + 1, column_A_Bluey) * 10000)
+        Cells(cnt + 1, column_A_BlueL) = Round(Cells(cnt + 1, 12) * 25)
+    Next
+End Sub
+
+Sub WjHl_Color()  '为了感谢吴警和洪亮的idea，这个反馈补偿函数以两位的名字命名
+    Dim DeltaRL As Integer '绿色亮度不变，改变红蓝，能够保证亮度不大变得情况下移动色坐标
+    Dim DeltaBL As Integer
+    
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        Cells(1 + cnt, column_Meas_Increment) = ""
+        'redx,y,L
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) > Cells(4, column_Para_Show) Then '只有deltaE>规定的行才做补偿
+            Dim delta_x As Double
+            Dim delta_y As Double
+            delta_x = Cells(cnt + 1, column_Meas_Whitex) - Cells(2, 16)
+            delta_y = Cells(cnt + 1, column_Meas_Whitey) - Cells(3, 16)
+        
+            If delta_x >= 0 And delta_y >= 0 Then                                           'x>=0.318. y>=0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(0,pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 9000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '蓝色减小使坐标朝蓝色方向移动. 红色增大一点点使得y坐标不至于太小
+                    DeltaBL = Round(Abs(delta_y) * 12000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(pi/4,pi/2)
+                    DeltaRL = Round(Abs(delta_x) * 9000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) - DeltaRL       '蓝色减小使坐标朝蓝色方向移动,红色减小一点点使得x坐标不至于太小
+                    DeltaBL = Round(Abs(delta_y) * 12000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & -DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+            If delta_x >= 0 And delta_y < 0 Then                                           'x>=0.318. y<0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(-pi/4,0)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '红色增大使坐标朝红反向运动，希望往蓝色那走一小点
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(-pi/2,-pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '绿色不够，红色增加使得坐标往红色反方向走，蓝色不好判断该加该减。希望往蓝色方向移动一小点
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+            
+            If delta_x < 0 And delta_y >= 0 Then                                           'x<0.318. y>=0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(3*pi/4,pi)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) - DeltaRL       '红色减小使坐标朝红色方向移动，希望往蓝色方向走一小点
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & -DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(-pi/2,-pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '红色增大使坐标朝红色反方向移动,希望往蓝色方向走一小点，下一个测试点还在这个区域会形成正反馈
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+
+            If delta_x < 0 And delta_y < 0 Then                                           'x<0.318. y<0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(pi,5/4*pi)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) - DeltaRL       '红色减小使坐标朝红色方向移动,蓝色增大使坐标朝蓝色反方向移动
+                    DeltaBL = Round(Abs(delta_y) * 6000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) + DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & -DeltaRL & ", " & DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(-pi/2,-pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '红色增大使色坐标朝红色反方向移动，蓝色增大使色坐标朝蓝色反方向移动
+                    DeltaBL = Round(Abs(delta_y) * 6000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) + DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+        End If 'deltaE process
+        '清除测量部分防止多次操作 TODO
+    Next 'For cnt = 1 To LEDs
+    
+    Range(Cells(cnt + 1, column_Meas_WhiteL), Cells(MAXLEDNum, column_Meas_Increment)).ClearContents
+    Range(Cells(cnt + 1, column_Meas_WhiteL), Cells(MAXLEDNum, column_Meas_Increment)).Interior.Pattern = xlNone
+
+End Sub
+
+
+Sub WjHl_Intensity()
+    Dim DeltaL As Double
+    
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        DeltaL = Cells(cnt + 1, column_Meas_WhiteL) / Cells(5, column_Para_Show) '白色测量亮度是标准的多少倍
+        Cells(1 + cnt, column_A_RedL) = Round(Cells(1 + cnt, column_A_RedL) * DeltaL) '修正红绿蓝的L，达到修正整体亮度的目的
+        Cells(1 + cnt, column_A_GreenL) = Round(Cells(1 + cnt, column_A_GreenL) * DeltaL)
+        Cells(1 + cnt, column_A_BlueL) = Round(Cells(1 + cnt, column_A_BlueL) * DeltaL)
+    Next
+End Sub
+
+
+Sub WjHl_Init()
+    LEDs = Cells(10, column_Para_Show)
+    
+    For cnt = 1 To LEDs
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Interior.Color = RGB(220, 230, 241) '灰蓝
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Font.Color = RGB(105, 29, 49) '深红字色
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE) = ""  'bad value default value
+    Next
+End Sub
+
+'这是某单元格改变后可触发的函数
+Private Sub Worksheet_Change(ByVal Target As Range)
+    If Target.Column = column_Para_Show Then
+        Select Case Target.Row
+            Case 4   'DeltaE阈值更新
+                Call GetDeltaE
+            Case 5  '期望亮度更新
+                Call LuminJudge
+            Case 6  '亮度tolerance更新
+                Call LuminJudge
+            Case 10
+                If Sheets("R").Cells(4, 11) <> Cells(10, column_Para_Show) Then
+                    Sheets("R").Cells(4, 11) = Cells(10, column_Para_Show)
+                End If
+                Call WjHl_Init
+        End Select
+    End If
+       
+    If Target.Column = column_Meas_Whitex Or Target.Column = column_Meas_Whitey Or Target.Column = column_Meas_WhiteL Then
+        Call GetDeltaE
+        Call LuminJudge
+    End If
+
+End Sub
+
+Sub GetDeltaE()
+    Dim u As Double
+    Dim v As Double
+    Dim standard_u As Double
+    Dim standard_v As Double
+    standard_u = 4 * Cells(2, column_Para_Show) / (-2 * Cells(2, column_Para_Show) + 12 * Cells(3, column_Para_Show) + 3)
+    standard_v = 9 * Cells(3, column_Para_Show) / (-2 * Cells(2, column_Para_Show) + 12 * Cells(3, column_Para_Show) + 3)
+    
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        u = 4 * Cells(cnt + 1, column_Meas_Whitex) / (-2 * Cells(cnt + 1, column_Meas_Whitex) + 12 * Cells(cnt + 1, column_Meas_Whitey) + 3) ' Cells(cnt+1, 19)是这颗LED白光的x坐标
+       ' Debug.Print "u=" & u & "    " & cnt
+        v = 9 * Cells(cnt + 1, column_Meas_Whitey) / (-2 * Cells(cnt + 1, column_Meas_Whitex) + 12 * Cells(cnt + 1, column_Meas_Whitey) + 3)
+       ' Debug.Print "v=" & v & "    " & cnt
+        Cells(cnt + 1, column_Meas_WhiteDeltaE) = Sqr((u - standard_u) * (u - standard_u) + (v - standard_v) * (v - standard_v))  '获得deltaE
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) < 0.00001 Then
+            Cells(cnt + 1, column_Meas_WhiteDeltaE) = 0
+        End If
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) < Cells(4, column_Para_Show) Then '0.005
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Interior.Color = RGB(0, 176, 80)  '绿色底色
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Font.Color = RGB(0, 0, 0)  '黑色字色
+        Else
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Interior.Color = RGB(250, 164, 203) '分红底色
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Font.Color = RGB(105, 29, 49)      '深红字色
+        End If
+        
+        
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Interior.Color = RGB(220, 230, 241) '灰蓝
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Font.Color = RGB(105, 29, 49) '深红字色
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE) = ""  'bad value default value
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) > DeltaE_Old(cnt) Then  '如果本次的测量比上次更糟
+            Cells(cnt + 1, column_Meas_OldWhiteDeltaE) = DeltaE_Old(cnt)
+        End If
+        DeltaE_Old(cnt) = Cells(cnt + 1, column_Meas_WhiteDeltaE)
+        Cells(cnt + 1, column_Meas_Increment).Interior.Color = RGB(253, 233, 217) '肉色
+    Next
+End Sub
+
+Sub LuminJudge()
+    MaxLumin = Round(Cells(5, column_Para_Show) * (1 + Cells(6, column_Para_Show) / 100))
+    MinLumin = Round(Cells(5, column_Para_Show) * (1 - Cells(6, column_Para_Show) / 100))
+    'Debug.Print MaxLumin
+    'Debug.Print MinLumin
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        If Cells(cnt + 1, column_Meas_WhiteL) >= MinLumin And Cells(cnt + 1, column_Meas_WhiteL) <= MaxLumin Then
+            Cells(cnt + 1, column_Meas_WhiteL).Interior.Color = RGB(0, 176, 80)
+            Cells(cnt + 1, column_Meas_WhiteL).Font.Color = RGB(0, 0, 0)  '黑色字色
+        Else
+            Cells(cnt + 1, column_Meas_WhiteL).Interior.Color = RGB(250, 164, 203) '分红底色
+            Cells(cnt + 1, column_Meas_WhiteL).Font.Color = RGB(105, 29, 49)      '深红字色
+        End If
+    Next
+    
+End Sub
+
+
+Sub Eff_Calculate()
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        'redx,y,L
+        Cells(cnt + 1, column_A_RedL) = Round(Cells(cnt + 1, column_A_RedL) * Cells(7, column_Para_Show))
+        'greenx,y,L
+        Cells(cnt + 1, column_A_GreenL) = Round(Cells(cnt + 1, column_A_GreenL) * Cells(8, column_Para_Show))
+        'bluex,y,L
+        Cells(cnt + 1, column_A_BlueL) = Round(Cells(cnt + 1, column_A_BlueL) * Cells(9, column_Para_Show))
+    Next
+End Sub
+
+
+Private Const column_A_Redx As Byte = 2
+Private Const column_A_Redy As Byte = 3
+Private Const column_A_RedL As Byte = 5
+Private Const column_A_Greenx As Byte = 6
+Private Const column_A_Greeny As Byte = 7
+Private Const column_A_GreenL As Byte = 9
+Private Const column_A_Bluex As Byte = 10
+Private Const column_A_Bluey As Byte = 11
+Private Const column_A_BlueL As Byte = 13
+Private Const column_Para_Show As Byte = 16
+Private Const column_Meas_WhiteL As Byte = 18
+Private Const column_Meas_Whitex As Byte = 19
+Private Const column_Meas_Whitey As Byte = 20
+Private Const column_Meas_OldWhiteDeltaE As Byte = 21
+Private Const column_Meas_WhiteDeltaE As Byte = 22
+Private Const column_Meas_Increment As Byte = 23
+Private Const MAXLEDNum As Integer = 90
+Dim LEDs As Integer
+Dim MaxLumin As Integer
+Dim MinLumin As Integer
+Dim Coeff_base(1 To MAXLEDNum) As Long  '万一级
+Dim Coeff_R2B(1 To MAXLEDNum) As Double '红色分量与蓝色分量的比值
+Dim cnt As Integer
+Dim DeltaE_Old(1 To MAXLEDNum) As Double
+
+Sub datafilling()
+
+    LEDs = Cells(10, column_Para_Show)
+    Range(Cells(2, 1), Cells(MAXLEDNum, 13)).ClearContents
+    Range(Cells(2, 2), Cells(MAXLEDNum, 13)).Interior.Pattern = xlSolid
+    Range(Cells(2, 2), Cells(MAXLEDNum, 13)).Interior.PatternColorIndex = xlAutomatic
+    Range(Cells(2, 2), Cells(MAXLEDNum, 5)).Interior.Color = 192
+    Range(Cells(2, 6), Cells(MAXLEDNum, 9)).Interior.Color = 5296274
+    Range(Cells(2, 10), Cells(MAXLEDNum, 13)).Interior.Color = 15773696
+    Range(Cells(LEDs + 2, 1), Cells(MAXLEDNum, 13)).Interior.Pattern = xlNone
+        
+    For cnt = 1 To LEDs
+        Cells(cnt + 1, 1) = cnt
+        Sheets("CaliValues").Cells(1 + cnt, 2) = Sheets("R").Cells(1 + cnt, 7)  'Redx
+        Sheets("CaliValues").Cells(1 + cnt, 3) = Sheets("R").Cells(1 + cnt, 8)  'Redy
+        Sheets("CaliValues").Cells(1 + cnt, 4) = Sheets("R").Cells(1 + cnt, 6)  'RedL
+        Sheets("CaliValues").Cells(1 + cnt, 6) = Sheets("G").Cells(1 + cnt, 7)  'Greenx
+        Sheets("CaliValues").Cells(1 + cnt, 7) = Sheets("G").Cells(1 + cnt, 8)  'Greeny
+        Sheets("CaliValues").Cells(1 + cnt, 8) = Sheets("G").Cells(1 + cnt, 6)  'GreenL
+        Sheets("CaliValues").Cells(1 + cnt, 10) = Sheets("B").Cells(1 + cnt, 7)  'Bluex
+        Sheets("CaliValues").Cells(1 + cnt, 11) = Sheets("B").Cells(1 + cnt, 8)  'Bluey
+        Sheets("CaliValues").Cells(1 + cnt, 12) = Sheets("B").Cells(1 + cnt, 6)  'BlueL
+    
+        'redx,y,L
+        Cells(cnt + 1, column_A_Redx) = Round(Cells(cnt + 1, column_A_Redx) * 10000)
+        Cells(cnt + 1, column_A_Redy) = Round(Cells(cnt + 1, column_A_Redy) * 10000)
+        Cells(cnt + 1, column_A_RedL) = Round(Cells(cnt + 1, 4) * 25)
+        'greenx,y,L
+        Cells(cnt + 1, column_A_Greenx) = Round(Cells(cnt + 1, column_A_Greenx) * 10000)
+        Cells(cnt + 1, column_A_Greeny) = Round(Cells(cnt + 1, column_A_Greeny) * 10000)
+        Cells(cnt + 1, column_A_GreenL) = Round(Cells(cnt + 1, 8) * 25)
+        'bluex,y,L
+        Cells(cnt + 1, column_A_Bluex) = Round(Cells(cnt + 1, column_A_Bluex) * 10000)
+        Cells(cnt + 1, column_A_Bluey) = Round(Cells(cnt + 1, column_A_Bluey) * 10000)
+        Cells(cnt + 1, column_A_BlueL) = Round(Cells(cnt + 1, 12) * 25)
+    Next
+End Sub
+
+Sub WjHl_Color()  '为了感谢吴警和洪亮的idea，这个反馈补偿函数以两位的名字命名
+    Dim DeltaRL As Integer '绿色亮度不变，改变红蓝，能够保证亮度不大变得情况下移动色坐标
+    Dim DeltaBL As Integer
+    
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        Cells(1 + cnt, column_Meas_Increment) = ""
+        'redx,y,L
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) > Cells(4, column_Para_Show) Then '只有deltaE>规定的行才做补偿
+            Dim delta_x As Double
+            Dim delta_y As Double
+            delta_x = Cells(cnt + 1, column_Meas_Whitex) - Cells(2, 16)
+            delta_y = Cells(cnt + 1, column_Meas_Whitey) - Cells(3, 16)
+        
+            If delta_x >= 0 And delta_y >= 0 Then                                           'x>=0.318. y>=0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(0,pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 9000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '蓝色减小使坐标朝蓝色方向移动. 红色增大一点点使得y坐标不至于太小
+                    DeltaBL = Round(Abs(delta_y) * 12000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(pi/4,pi/2)
+                    DeltaRL = Round(Abs(delta_x) * 9000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) - DeltaRL       '蓝色减小使坐标朝蓝色方向移动,红色减小一点点使得x坐标不至于太小
+                    DeltaBL = Round(Abs(delta_y) * 12000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & -DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+            If delta_x >= 0 And delta_y < 0 Then                                           'x>=0.318. y<0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(-pi/4,0)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '红色增大使坐标朝红反向运动，希望往蓝色那走一小点
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(-pi/2,-pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '绿色不够，红色增加使得坐标往红色反方向走，蓝色不好判断该加该减。希望往蓝色方向移动一小点
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+            
+            If delta_x < 0 And delta_y >= 0 Then                                           'x<0.318. y>=0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(3*pi/4,pi)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) - DeltaRL       '红色减小使坐标朝红色方向移动，希望往蓝色方向走一小点
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & -DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(-pi/2,-pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '红色增大使坐标朝红色反方向移动,希望往蓝色方向走一小点，下一个测试点还在这个区域会形成正反馈
+                    DeltaBL = Round(Abs(delta_y) * 3000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) - DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & -DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+
+            If delta_x < 0 And delta_y < 0 Then                                           'x<0.318. y<0.318
+                If Abs(delta_x) > Abs(delta_y) Then                                         '(pi,5/4*pi)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) - DeltaRL       '红色减小使坐标朝红色方向移动,蓝色增大使坐标朝蓝色反方向移动
+                    DeltaBL = Round(Abs(delta_y) * 6000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) + DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & -DeltaRL & ", " & DeltaBL & "]"                       '写出偏移的大小
+                Else                                                                        '(-pi/2,-pi/4)
+                    DeltaRL = Round(Abs(delta_x) * 12000)
+                    Cells(1 + cnt, column_A_RedL) = Cells(1 + cnt, column_A_RedL) + DeltaRL       '红色增大使色坐标朝红色反方向移动，蓝色增大使色坐标朝蓝色反方向移动
+                    DeltaBL = Round(Abs(delta_y) * 6000)
+                    Cells(1 + cnt, column_A_BlueL) = Cells(1 + cnt, column_A_BlueL) + DeltaBL
+                    Cells(1 + cnt, column_Meas_Increment) = "[" & DeltaRL & ", " & DeltaBL & "]"                       '写出偏移的大小
+                End If
+            End If
+        End If 'deltaE process
+        '清除测量部分防止多次操作 TODO
+    Next 'For cnt = 1 To LEDs
+    
+    Range(Cells(cnt + 1, column_Meas_WhiteL), Cells(MAXLEDNum, column_Meas_Increment)).ClearContents
+    Range(Cells(cnt + 1, column_Meas_WhiteL), Cells(MAXLEDNum, column_Meas_Increment)).Interior.Pattern = xlNone
+
+End Sub
+
+
+Sub WjHl_Intensity()
+    Dim DeltaL As Double
+    
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        DeltaL = Cells(cnt + 1, column_Meas_WhiteL) / Cells(5, column_Para_Show) '白色测量亮度是标准的多少倍
+        Cells(1 + cnt, column_A_RedL) = Round(Cells(1 + cnt, column_A_RedL) * DeltaL) '修正红绿蓝的L，达到修正整体亮度的目的
+        Cells(1 + cnt, column_A_GreenL) = Round(Cells(1 + cnt, column_A_GreenL) * DeltaL)
+        Cells(1 + cnt, column_A_BlueL) = Round(Cells(1 + cnt, column_A_BlueL) * DeltaL)
+    Next
+End Sub
+
+
+Sub WjHl_Init()
+    LEDs = Cells(10, column_Para_Show)
+    
+    For cnt = 1 To LEDs
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Interior.Color = RGB(220, 230, 241) '灰蓝
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Font.Color = RGB(105, 29, 49) '深红字色
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE) = ""  'bad value default value
+    Next
+End Sub
+
+'这是某单元格改变后可触发的函数
+Private Sub Worksheet_Change(ByVal Target As Range)
+    If Target.Column = column_Para_Show Then
+        Select Case Target.Row
+            Case 4   'DeltaE阈值更新
+                Call GetDeltaE
+            Case 5  '期望亮度更新
+                Call LuminJudge
+            Case 6  '亮度tolerance更新
+                Call LuminJudge
+            Case 10
+                If Sheets("R").Cells(4, 11) <> Cells(10, column_Para_Show) Then
+                    Sheets("R").Cells(4, 11) = Cells(10, column_Para_Show)
+                End If
+                Call WjHl_Init
+        End Select
+    End If
+       
+    If Target.Column = column_Meas_Whitex Or Target.Column = column_Meas_Whitey Or Target.Column = column_Meas_WhiteL Then
+        Call GetDeltaE
+        Call LuminJudge
+    End If
+
+End Sub
+
+Sub GetDeltaE()
+    Dim u As Double
+    Dim v As Double
+    Dim standard_u As Double
+    Dim standard_v As Double
+    standard_u = 4 * Cells(2, column_Para_Show) / (-2 * Cells(2, column_Para_Show) + 12 * Cells(3, column_Para_Show) + 3)
+    standard_v = 9 * Cells(3, column_Para_Show) / (-2 * Cells(2, column_Para_Show) + 12 * Cells(3, column_Para_Show) + 3)
+    
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        u = 4 * Cells(cnt + 1, column_Meas_Whitex) / (-2 * Cells(cnt + 1, column_Meas_Whitex) + 12 * Cells(cnt + 1, column_Meas_Whitey) + 3) ' Cells(cnt+1, 19)是这颗LED白光的x坐标
+       ' Debug.Print "u=" & u & "    " & cnt
+        v = 9 * Cells(cnt + 1, column_Meas_Whitey) / (-2 * Cells(cnt + 1, column_Meas_Whitex) + 12 * Cells(cnt + 1, column_Meas_Whitey) + 3)
+       ' Debug.Print "v=" & v & "    " & cnt
+        Cells(cnt + 1, column_Meas_WhiteDeltaE) = Sqr((u - standard_u) * (u - standard_u) + (v - standard_v) * (v - standard_v))  '获得deltaE
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) < 0.00001 Then
+            Cells(cnt + 1, column_Meas_WhiteDeltaE) = 0
+        End If
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) < Cells(4, column_Para_Show) Then '0.005
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Interior.Color = RGB(0, 176, 80)  '绿色底色
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Font.Color = RGB(0, 0, 0)  '黑色字色
+        Else
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Interior.Color = RGB(250, 164, 203) '分红底色
+            Cells(cnt + 1, column_Meas_WhiteDeltaE).Font.Color = RGB(105, 29, 49)      '深红字色
+        End If
+        
+        
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Interior.Color = RGB(220, 230, 241) '灰蓝
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE).Font.Color = RGB(105, 29, 49) '深红字色
+        Cells(cnt + 1, column_Meas_OldWhiteDeltaE) = ""  'bad value default value
+        If Cells(cnt + 1, column_Meas_WhiteDeltaE) > DeltaE_Old(cnt) Then  '如果本次的测量比上次更糟
+            Cells(cnt + 1, column_Meas_OldWhiteDeltaE) = DeltaE_Old(cnt)
+        End If
+        DeltaE_Old(cnt) = Cells(cnt + 1, column_Meas_WhiteDeltaE)
+        Cells(cnt + 1, column_Meas_Increment).Interior.Color = RGB(253, 233, 217) '肉色
+    Next
+End Sub
+
+Sub LuminJudge()
+    MaxLumin = Round(Cells(5, column_Para_Show) * (1 + Cells(6, column_Para_Show) / 100))
+    MinLumin = Round(Cells(5, column_Para_Show) * (1 - Cells(6, column_Para_Show) / 100))
+    'Debug.Print MaxLumin
+    'Debug.Print MinLumin
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        If Cells(cnt + 1, column_Meas_WhiteL) >= MinLumin And Cells(cnt + 1, column_Meas_WhiteL) <= MaxLumin Then
+            Cells(cnt + 1, column_Meas_WhiteL).Interior.Color = RGB(0, 176, 80)
+            Cells(cnt + 1, column_Meas_WhiteL).Font.Color = RGB(0, 0, 0)  '黑色字色
+        Else
+            Cells(cnt + 1, column_Meas_WhiteL).Interior.Color = RGB(250, 164, 203) '分红底色
+            Cells(cnt + 1, column_Meas_WhiteL).Font.Color = RGB(105, 29, 49)      '深红字色
+        End If
+    Next
+    
+End Sub
+
+
+Sub Eff_Calculate()
+    LEDs = Cells(10, column_Para_Show)
+    For cnt = 1 To LEDs
+        'redx,y,L
+        Cells(cnt + 1, column_A_RedL) = Round(Cells(cnt + 1, column_A_RedL) * Cells(7, column_Para_Show))
+        'greenx,y,L
+        Cells(cnt + 1, column_A_GreenL) = Round(Cells(cnt + 1, column_A_GreenL) * Cells(8, column_Para_Show))
+        'bluex,y,L
+        Cells(cnt + 1, column_A_BlueL) = Round(Cells(cnt + 1, column_A_BlueL) * Cells(9, column_Para_Show))
+    Next
+End Sub
+
+

@@ -1,0 +1,101 @@
+
+Private Const LEDMax As Integer = 80
+Dim LEDs As Integer
+Dim MAXLine As Integer
+
+Sub ljm_Click()
+    Dim MAXLine As Integer
+    MAXLine = Range("A65536").End(3).Row
+    'Debug.Print "totalline=" + Str(MAXLine)
+    Dim averageDuty As Integer
+    Dim complement As Integer
+    Dim cnt, cnt_led As Integer
+    
+    
+    LEDs = Cells(4, 11)
+    If MAXLine > 1 Then
+        averageDuty = Int((MAXLine - 1) / LEDs) ' also can be seen as groups
+        complement = (MAXLine - 1) Mod LEDs
+       'Debug.Print "complement=" + Str(complement)
+        'averageDuty表示一个led需要averageDuty行的数据取平均
+       ' Debug.Print "averageDuty=" + Str(averageDuty)
+        Dim normal_cycle As Integer
+        normal_cycle = LEDs - complement
+        Dim first_in_group As Integer
+       ' Debug.Print "normal_cycle=" + Str(normal_cycle)
+        
+        Dim sumx, sumy, sumL As Double
+        sumx = 0
+        sumy = 0
+        sumL = 0
+        normal_cycle_cnt = 0
+    
+        For cnt_led = 1 To LEDs
+            If normal_cycle_cnt <= normal_cycle Then
+                first_in_group = 2 + (cnt_led - 1) * averageDuty
+                'Debug.Print "led " & cnt_led & "::fisrt line = " & first_in_group
+                For cnt = 1 To averageDuty
+                    sumx = sumx + Val(Cells(first_in_group + cnt - 1, 2))
+                    sumy = sumy + Val(Cells(first_in_group + cnt - 1, 3))
+                    sumL = sumL + Val(Cells(first_in_group + cnt - 1, 1))
+                Next
+                sumx = sumx / averageDuty
+                sumy = sumy / averageDuty
+                sumL = sumL / averageDuty * Cells(3, 11)
+    
+                Cells(1 + cnt_led, 7) = sumx
+                Cells(1 + cnt_led, 8) = sumy
+                Cells(1 + cnt_led, 6) = sumL
+                normal_cycle_cnt = normal_cycle_cnt + 1
+    
+                sumx = 0
+                sumy = 0
+                sumL = 0
+     ''''''''''''''
+            Else
+                first_in_group = 2 + normal_cycle * averageDuty + (cnt_led - 1 - normal_cycle) * (averageDuty + 1)
+                Debug.Print "   led" & cnt_led & "::fisrt line = " & first_in_group
+                For cnt = 1 To averageDuty + 1
+                    sumx = sumx + Val(Cells(first_in_group + cnt - 1, 2))
+                    sumy = sumy + Val(Cells(first_in_group + cnt - 1, 3))
+                    sumL = sumL + Val(Cells(first_in_group + cnt - 1, 1))
+                Next
+                sumx = sumx / (averageDuty + 1)
+                sumy = sumy / (averageDuty + 1)
+                sumL = sumL / (averageDuty + 1)
+    
+                Cells(1 + cnt_led, 7) = sumx
+                Cells(1 + cnt_led, 8) = sumy
+                Cells(1 + cnt_led, 6) = sumL * Cells(3, 11)
+            
+                sumx = 0
+                sumy = 0
+                sumL = 0
+            End If
+            Cells(1 + cnt_led, 5) = cnt_led
+        Next
+        Cells(2, 11) = MAXLine - 1
+
+        '去掉多余项
+        For cnt2 = cnt_led + 1 To LEDMax
+            Cells(cnt2, 7) = ""
+            Cells(cnt2, 8) = ""
+            Cells(cnt2, 6) = ""
+            Cells(cnt2, 5) = ""
+        Next
+
+
+    End If  'if MaxLine>1
+End Sub
+
+
+Sub ClearData()
+    TargetValue = Sheets("G").Range("K4").value
+    MAXLine = Range("A65536").End(3).Row
+    If MAXLine > 1 Then
+        'Range("A1:B1").ClearContents
+        Range(Cells(2, 1), Cells(MAXLine, 3)).ClearContents
+        Range(Cells(2, 6), Cells(TargetValue, 8)).ClearContents
+        Cells(2, 11) = 0
+    End If
+End Sub

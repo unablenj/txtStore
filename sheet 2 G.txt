@@ -1,0 +1,23 @@
+
+Dim TargetValue As Integer
+
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    If Target.Column = 11 And Target.Row = 4 Then
+        TargetValue = Target
+        'Debug.Print TargetValue
+        If Sheets("R").Range("K4").value <> TargetValue Then
+            Sheets("R").Range("K4").value = TargetValue
+        End If
+        If Sheets("B").Range("K4").value <> TargetValue Then
+            Sheets("B").Range("K4").value = TargetValue
+        End If
+        Range(Cells(2, 6), Cells(TargetValue, 8)).ClearContents
+
+        If Sheets("CaliValues").Range("P10").value <> TargetValue Then
+            Sheets("CaliValues").Range("P10").value = TargetValue
+        End If
+        
+    End If
+End Sub
+
